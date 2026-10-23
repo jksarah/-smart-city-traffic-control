@@ -9,7 +9,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "client"))
 from client import BrokerClient
 
 TOPIC = "IntersectionSensor"
-INTERSECTION_COUNT = 4
+INTERSECTION_COUNT = 5
 MIN_DELAY_SECONDS = 0.5
 MAX_DELAY_SECONDS = 2
 
