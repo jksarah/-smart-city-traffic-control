@@ -9,27 +9,46 @@ from client import BrokerClient
 
 SENSOR_TOPIC = "IntersectionSensor"
 SIGNAL_TOPIC = "IntersectionSignal"
-GREEN_QUEUE_LENGTH = 3
-RELEASE_SECONDS = 1
+INTERSECTION_COUNT = 5
+TICK_SECONDS = 1
+PHASE_ORDER = ["red", "green", "yellow"]
+BASE_DURATIONS = {"red": 8, "green": 6, "yellow": 2}
+EXTRA_QUEUE_THRESHOLD = 3
+MAX_GREEN_SECONDS = 15
 
-queues = {}
-lights = {}
+queues = {i: 0 for i in range(1, INTERSECTION_COUNT + 1)}
+phases = {i: "red" for i in queues}
+remaining = {i: BASE_DURATIONS["red"] for i in queues}
 
 
-def update_light(intersection_id):
-    queue = queues[intersection_id]
-    light = lights.get(intersection_id, "red")
-    if light == "red" and queue >= GREEN_QUEUE_LENGTH:
-        lights[intersection_id] = "green"
-    elif light == "green" and queue == 0:
-        lights[intersection_id] = "red"
+def next_phase(phase):
+    index = PHASE_ORDER.index(phase)
+    return PHASE_ORDER[(index + 1) % len(PHASE_ORDER)]
+
+
+def phase_duration(phase, queue_length):
+    duration = BASE_DURATIONS[phase]
+    if phase == "green":
+        extra = max(0, queue_length - EXTRA_QUEUE_THRESHOLD)
+        duration = min(duration + extra, MAX_GREEN_SECONDS)
+    return duration
+
+
+def advance(intersection_id):
+    """Count down one tick; move to the next phase when time runs out."""
+    remaining[intersection_id] -= TICK_SECONDS
+    if remaining[intersection_id] <= 0:
+        phase = next_phase(phases[intersection_id])
+        phases[intersection_id] = phase
+        remaining[intersection_id] = phase_duration(phase, queues[intersection_id])
 
 
 async def publish_state(client, intersection_id):
     state = {
         "intersection_id": intersection_id,
-        "light": lights.get(intersection_id, "red"),
+        "light": phases[intersection_id],
         "queue": queues[intersection_id],
+        "remaining": remaining[intersection_id],
     }
     await client.publish(SIGNAL_TOPIC, state)
 
@@ -40,24 +59,23 @@ async def handle_arrivals(client):
         if event["type"] != "arrive":
             continue
         intersection_id = event["intersection_id"]
-        queues[intersection_id] = queues.get(intersection_id, 0) + 1
-        update_light(intersection_id)
+        queues[intersection_id] += 1
         await publish_state(client, intersection_id)
 
 
-async def release_cars(client):
+async def run_signals(client):
     while True:
-        await asyncio.sleep(RELEASE_SECONDS)
-        for intersection_id in list(queues):
-            if lights.get(intersection_id) == "green":
+        await asyncio.sleep(TICK_SECONDS)
+        for intersection_id in queues:
+            if phases[intersection_id] == "green" and queues[intersection_id] > 0:
                 queues[intersection_id] -= 1
-                update_light(intersection_id)
-                await publish_state(client, intersection_id)
+            advance(intersection_id)
+            await publish_state(client, intersection_id)
 
 
 async def main():
     async with BrokerClient() as client:
-        await asyncio.gather(handle_arrivals(client), release_cars(client))
+        await asyncio.gather(handle_arrivals(client), run_signals(client))
 
 
 if __name__ == "__main__":
