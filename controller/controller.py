@@ -4,21 +4,23 @@ import sys
 
 # The client folder is not a package, so add it to the import path.
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "client"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "config"))
 
 from client import BrokerClient
+from settings import load_config
 
 SENSOR_TOPIC = "IntersectionSensor"
 SIGNAL_TOPIC = "IntersectionSignal"
 OVERRIDE_TOPIC = "IntersectionOverride"
-INTERSECTION_COUNT = 5
+CONFIG = load_config()
 TICK_SECONDS = 1
 PHASE_ORDER = ["red", "green", "yellow"]
-BASE_DURATIONS = {"red": 8, "green": 6, "yellow": 2}
-EXTRA_QUEUE_THRESHOLD = 3
-MAX_GREEN_SECONDS = 15
-DEFAULT_OVERRIDE_SECONDS = 10
+BASE_DURATIONS = CONFIG["durations"]
+EXTRA_QUEUE_THRESHOLD = CONFIG["extra_queue_threshold"]
+MAX_GREEN_SECONDS = CONFIG["max_green_seconds"]
+DEFAULT_OVERRIDE_SECONDS = CONFIG["default_override_seconds"]
 
-queues = {i: 0 for i in range(1, INTERSECTION_COUNT + 1)}
+queues = {i: 0 for i in CONFIG["intersections"]}
 phases = {i: "red" for i in queues}
 remaining = {i: BASE_DURATIONS["red"] for i in queues}
 overridden = set()
