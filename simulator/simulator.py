@@ -5,17 +5,18 @@ import sys
 
 # The client folder is not a package, so add it to the import path.
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "client"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "config"))
 
 from client import BrokerClient
+from settings import load_config
 
 SENSOR_TOPIC = "IntersectionSensor"
 SIGNAL_TOPIC = "IntersectionSignal"
-INTERSECTION_COUNT = 5
-MIN_DELAY_SECONDS = 0.5
-MAX_DELAY_SECONDS = 2
+CONFIG = load_config()
+MIN_DELAY_SECONDS, MAX_DELAY_SECONDS = CONFIG["arrival_delay_seconds"]
 DEPART_SECONDS = 1
 
-waiting = {i: 0 for i in range(1, INTERSECTION_COUNT + 1)}
+waiting = {i: 0 for i in CONFIG["intersections"]}
 lights = {i: "red" for i in waiting}
 
 
@@ -39,7 +40,7 @@ async def read_signals(client):
 
 async def generate_arrivals(client):
     while True:
-        intersection_id = random.randint(1, INTERSECTION_COUNT)
+        intersection_id = random.choice(CONFIG["intersections"])
         waiting[intersection_id] += 1
         await send_event(client, intersection_id, "arrive")
         await asyncio.sleep(random.uniform(MIN_DELAY_SECONDS, MAX_DELAY_SECONDS))
