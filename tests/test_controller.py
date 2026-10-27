@@ -90,3 +90,16 @@ def test_publish_only_when_state_changes():
     asyncio.run(run())
     assert len(client.published) == 2
     assert client.published[1]["queue"] == 1
+
+
+def test_depart_lowers_queue_but_not_below_zero():
+    controller.queues[4] = 1
+    controller.apply_sensor_event({"intersection_id": 4, "type": "depart"})
+    controller.apply_sensor_event({"intersection_id": 4, "type": "depart"})
+    assert controller.queues[4] == 0
+
+
+def test_arrive_raises_queue():
+    controller.queues[4] = 0
+    controller.apply_sensor_event({"intersection_id": 4, "type": "arrive"})
+    assert controller.queues[4] == 1

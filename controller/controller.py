@@ -66,7 +66,7 @@ def apply_override(command):
 def current_state(intersection_id):
     return {
         "intersection_id": intersection_id,
-        "light": phases[intersection_id],
+        "light": phases[intersection_id],      
         "queue": queues[intersection_id],
         "override": intersection_id in overridden,
     }
@@ -82,6 +82,16 @@ async def publish_state(client, intersection_id):
     await client.publish(SIGNAL_TOPIC, {**state, "remaining": remaining[intersection_id]})
 
 
+def apply_sensor_event(event):
+    intersection_id = event.get("intersection_id")
+    if intersection_id not in queues:
+        return
+    if event.get("type") == "arrive":
+        queues[intersection_id] += 1
+    elif event.get("type") == "depart":
+        queues[intersection_id] = max(0, queues[intersection_id] - 1)
+
+
 async def handle_messages(client):
     await client.subscribe(SENSOR_TOPIC)
     await client.subscribe(OVERRIDE_TOPIC)
@@ -89,11 +99,9 @@ async def handle_messages(client):
         if topic == OVERRIDE_TOPIC:
             apply_override(data)
             intersection_id = data.get("intersection_id")
-        elif data["type"] == "arrive":
-            intersection_id = data["intersection_id"]
-            queues[intersection_id] += 1
         else:
-            continue
+            apply_sensor_event(data)
+            intersection_id = data.get("intersection_id")
         if intersection_id in queues:
             await publish_state(client, intersection_id)
 
@@ -102,8 +110,6 @@ async def run_signals(client):
     while True:
         await asyncio.sleep(TICK_SECONDS)
         for intersection_id in queues:
-            if phases[intersection_id] == "green" and queues[intersection_id] > 0:
-                queues[intersection_id] -= 1
             advance(intersection_id)
             await publish_state(client, intersection_id)
 
