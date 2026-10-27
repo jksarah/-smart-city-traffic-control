@@ -22,6 +22,7 @@ queues = {i: 0 for i in range(1, INTERSECTION_COUNT + 1)}
 phases = {i: "red" for i in queues}
 remaining = {i: BASE_DURATIONS["red"] for i in queues}
 overridden = set()
+last_published = {}
 
 
 def next_phase(phase):
@@ -62,15 +63,23 @@ def apply_override(command):
         overridden.discard(intersection_id)
 
 
-async def publish_state(client, intersection_id):
-    state = {
+def current_state(intersection_id):
+    return {
         "intersection_id": intersection_id,
         "light": phases[intersection_id],
         "queue": queues[intersection_id],
-        "remaining": remaining[intersection_id],
         "override": intersection_id in overridden,
     }
-    await client.publish(SIGNAL_TOPIC, state)
+
+
+async def publish_state(client, intersection_id):
+    """Publish only when the light, queue or override flag changed."""
+    state = current_state(intersection_id)
+    if last_published.get(intersection_id) == state:
+        return
+    last_published[intersection_id] = state
+    # Remaining is sent but not compared, so a countdown tick alone never publishes.
+    await client.publish(SIGNAL_TOPIC, {**state, "remaining": remaining[intersection_id]})
 
 
 async def handle_messages(client):
