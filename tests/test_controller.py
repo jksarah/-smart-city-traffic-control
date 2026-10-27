@@ -1,3 +1,4 @@
+import asyncio
 import os
 import sys
 
@@ -63,3 +64,29 @@ def test_cancel_ends_override_with_yellow():
 def test_unknown_intersection_is_ignored():
     controller.apply_override({"intersection_id": 99, "action": "free", "duration": 5})
     assert 99 not in controller.overridden
+
+
+class FakeClient:
+    def __init__(self):
+        self.published = []
+
+    async def publish(self, topic, data):
+        self.published.append(data)
+
+
+def test_publish_only_when_state_changes():
+    reset(3)
+    controller.last_published.pop(3, None)
+    controller.queues[3] = 0
+    client = FakeClient()
+
+    async def run():
+        await controller.publish_state(client, 3)
+        controller.remaining[3] -= 1
+        await controller.publish_state(client, 3)
+        controller.queues[3] += 1
+        await controller.publish_state(client, 3)
+
+    asyncio.run(run())
+    assert len(client.published) == 2
+    assert client.published[1]["queue"] == 1
