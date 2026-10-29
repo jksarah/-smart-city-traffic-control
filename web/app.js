@@ -3,6 +3,7 @@ const SIGNAL_TOPIC = "IntersectionSignal";
 const OVERRIDE_TOPIC = "IntersectionOverride";
 const COUNTDOWN_MS = 1000;
 const MAX_LOG_ENTRIES = 100;
+const RECONNECT_MS = 2000;
 
 const statusElement = document.getElementById("status");
 const intersectionsElement = document.getElementById("intersections");
@@ -22,6 +23,10 @@ function logEvent(text) {
 }
 
 function setStatus(text) {
+    // Failed reconnect attempts would otherwise log "disconnected" every time.
+    if (statusElement.textContent === text) {
+        return;
+    }
     statusElement.textContent = text;
     statusElement.className = text;
     logEvent(`Broker ${text}`);
@@ -114,6 +119,7 @@ function connect() {
 
     socket.addEventListener("close", () => {
         setStatus("disconnected");
+        setTimeout(connect, RECONNECT_MS);
     });
 }
 
