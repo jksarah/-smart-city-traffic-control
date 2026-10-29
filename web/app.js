@@ -2,13 +2,30 @@ const BROKER_URL = "ws://localhost:8765";
 const SIGNAL_TOPIC = "IntersectionSignal";
 const OVERRIDE_TOPIC = "IntersectionOverride";
 const COUNTDOWN_MS = 1000;
+const MAX_LOG_ENTRIES = 100;
 
 const statusElement = document.getElementById("status");
 const intersectionsElement = document.getElementById("intersections");
+const logElement = document.getElementById("log");
 
 // Latest state and card elements for each intersection id.
 const cards = new Map();
 let socket = null;
+
+function logEvent(text) {
+    const item = document.createElement("li");
+    item.textContent = `${new Date().toLocaleTimeString()}  ${text}`;
+    logElement.prepend(item);
+    while (logElement.children.length > MAX_LOG_ENTRIES) {
+        logElement.lastChild.remove();
+    }
+}
+
+function setStatus(text) {
+    statusElement.textContent = text;
+    statusElement.className = text;
+    logEvent(`Broker ${text}`);
+}
 
 function sendOverride(intersectionId, action) {
     if (socket?.readyState !== WebSocket.OPEN) {
@@ -27,7 +44,7 @@ function createCard(intersectionId) {
         <div class="queue"></div>
         <div class="time"></div>
         <div class="override"></div>`;
-    const card = { element, remaining: 0, overridden: false };
+    const card = { element, remaining: 0, overridden: false, light: null };
     // Clicking forces green; clicking an overridden card cancels it.
     element.addEventListener("click", () => {
         sendOverride(intersectionId, card.overridden ? "cancel" : "free");
@@ -49,9 +66,21 @@ function showTime(card) {
     card.element.querySelector(".time").textContent = `Time left: ${card.remaining}s`;
 }
 
+function logChanges(state, card) {
+    const name = `Intersection ${state.intersection_id}`;
+    if (state.override !== card.overridden) {
+        logEvent(`${name}: override ${state.override ? "started" : "ended"}`);
+    }
+    if (state.light !== card.light) {
+        logEvent(`${name}: ${state.light}`);
+    }
+}
+
 function updateCard(state) {
     const card = cards.get(state.intersection_id) ?? createCard(state.intersection_id);
+    logChanges(state, card);
     card.remaining = state.remaining;
+    card.light = state.light;
     card.overridden = state.override;
     card.element.classList.toggle("overridden", state.override);
     drawIntersection(card.element.querySelector("canvas"), state);
@@ -72,7 +101,7 @@ function connect() {
     socket = new WebSocket(BROKER_URL);
 
     socket.addEventListener("open", () => {
-        statusElement.textContent = "connected";
+        setStatus("connected");
         socket.send(JSON.stringify({ type: "subscribe", topic: SIGNAL_TOPIC }));
     });
 
@@ -84,7 +113,7 @@ function connect() {
     });
 
     socket.addEventListener("close", () => {
-        statusElement.textContent = "disconnected";
+        setStatus("disconnected");
     });
 }
 
