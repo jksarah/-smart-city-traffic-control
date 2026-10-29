@@ -17,6 +17,12 @@ body {
     padding: 16px;
     width: 160px;
     text-align: center;
+    cursor: pointer;
+    border: 2px solid transparent;
+}
+
+.card.overridden {
+    border-color: #ffb300;
 }
 
 .override {
