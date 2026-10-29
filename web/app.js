@@ -13,7 +13,7 @@ function createCard(intersectionId) {
     element.className = "card";
     element.innerHTML = `
         <h3>Intersection ${intersectionId}</h3>
-        <div class="light"></div>
+        <canvas width="${CANVAS_WIDTH}" height="${CANVAS_HEIGHT}"></canvas>
         <div class="queue"></div>
         <div class="time"></div>
         <div class="override"></div>`;
@@ -38,7 +38,7 @@ function showTime(card) {
 function updateCard(state) {
     const card = cards.get(state.intersection_id) ?? createCard(state.intersection_id);
     card.remaining = state.remaining;
-    card.element.querySelector(".light").className = `light ${state.light}`;
+    drawIntersection(card.element.querySelector("canvas"), state);
     card.element.querySelector(".queue").textContent = `Queue: ${state.queue}`;
     card.element.querySelector(".override").textContent = state.override ? "OVERRIDE" : "";
     showTime(card);
