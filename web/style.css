@@ -1,0 +1,46 @@
+body {
+    font-family: sans-serif;
+    background: #1b1f27;
+    color: #e6e6e6;
+    margin: 20px;
+}
+
+#intersections {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.card {
+    background: #2a303c;
+    border-radius: 8px;
+    padding: 16px;
+    width: 160px;
+    text-align: center;
+}
+
+.light {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    margin: 12px auto;
+    background: #555;
+}
+
+.light.red {
+    background: #e53935;
+}
+
+.light.green {
+    background: #43a047;
+}
+
+.light.yellow {
+    background: #fdd835;
+}
+
+.override {
+    color: #ffb300;
+    font-weight: bold;
+    height: 1.2em;
+}
