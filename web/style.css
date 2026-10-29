@@ -19,26 +19,6 @@ body {
     text-align: center;
 }
 
-.light {
-    width: 60px;
-    height: 60px;
-    border-radius: 50%;
-    margin: 12px auto;
-    background: #555;
-}
-
-.light.red {
-    background: #e53935;
-}
-
-.light.green {
-    background: #43a047;
-}
-
-.light.yellow {
-    background: #fdd835;
-}
-
 .override {
     color: #ffb300;
     font-weight: bold;
