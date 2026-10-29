@@ -30,3 +30,22 @@ body {
     font-weight: bold;
     height: 1.2em;
 }
+
+#status.connected {
+    color: #43a047;
+}
+
+#status.disconnected {
+    color: #e53935;
+}
+
+#log {
+    list-style: none;
+    padding: 8px 12px;
+    max-height: 220px;
+    overflow-y: auto;
+    background: #2a303c;
+    border-radius: 8px;
+    font-family: monospace;
+    font-size: 13px;
+}
