@@ -5,30 +5,9 @@ body {
     margin: 20px;
 }
 
-#intersections {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 16px;
-}
-
-.card {
-    background: #2a303c;
-    border-radius: 8px;
-    padding: 16px;
-    width: 160px;
-    text-align: center;
+#map {
+    display: block;
     cursor: pointer;
-    border: 2px solid transparent;
-}
-
-.card.overridden {
-    border-color: #ffb300;
-}
-
-.override {
-    color: #ffb300;
-    font-weight: bold;
-    height: 1.2em;
 }
 
 #status.connected {

@@ -6,11 +6,11 @@ const MAX_LOG_ENTRIES = 100;
 const RECONNECT_MS = 2000;
 
 const statusElement = document.getElementById("status");
-const intersectionsElement = document.getElementById("intersections");
+const mapElement = document.getElementById("map");
 const logElement = document.getElementById("log");
 
-// Latest state and card elements for each intersection id.
-const cards = new Map();
+// Latest state and seconds left for each intersection id.
+const intersections = new Map();
 let socket = null;
 
 function logEvent(text) {
@@ -40,66 +40,48 @@ function sendOverride(intersectionId, action) {
     socket.send(JSON.stringify({ type: "publish", topic: OVERRIDE_TOPIC, data: command }));
 }
 
-function createCard(intersectionId) {
-    const element = document.createElement("div");
-    element.className = "card";
-    element.innerHTML = `
-        <h3>Intersection ${intersectionId}</h3>
-        <canvas width="${CANVAS_WIDTH}" height="${CANVAS_HEIGHT}"></canvas>
-        <div class="queue"></div>
-        <div class="time"></div>
-        <div class="override"></div>`;
-    const card = { element, remaining: 0, overridden: false, light: null };
-    // Clicking forces green; clicking an overridden card cancels it.
-    element.addEventListener("click", () => {
-        sendOverride(intersectionId, card.overridden ? "cancel" : "free");
-    });
-    cards.set(intersectionId, card);
-    intersectionsElement.append(element);
-    sortCards();
-    return card;
+function sortedIntersections() {
+    return [...intersections.entries()].sort((a, b) => a[0] - b[0]).map(([, value]) => value);
 }
 
-function sortCards() {
-    const ids = [...cards.keys()].sort((a, b) => a - b);
-    for (const id of ids) {
-        intersectionsElement.append(cards.get(id).element);
+function render() {
+    drawMap(mapElement, sortedIntersections());
+}
+
+// Clicking forces green; clicking an overridden intersection cancels it.
+mapElement.addEventListener("click", (event) => {
+    const bounds = mapElement.getBoundingClientRect();
+    const column = Math.floor((event.clientX - bounds.left) / CELL_SIZE);
+    const row = Math.floor((event.clientY - bounds.top) / CELL_SIZE);
+    const clicked = sortedIntersections()[row * COLUMNS + column];
+    if (column < COLUMNS && clicked) {
+        const { intersection_id: id, override } = clicked.state;
+        sendOverride(id, override ? "cancel" : "free");
     }
-}
+});
 
-function showTime(card) {
-    card.element.querySelector(".time").textContent = `Time left: ${card.remaining}s`;
-}
-
-function logChanges(state, card) {
+function logChanges(state, previous) {
     const name = `Intersection ${state.intersection_id}`;
-    if (state.override !== card.overridden) {
+    if (state.override !== (previous?.state.override ?? false)) {
         logEvent(`${name}: override ${state.override ? "started" : "ended"}`);
     }
-    if (state.light !== card.light) {
+    if (state.light !== previous?.state.light) {
         logEvent(`${name}: ${state.light}`);
     }
 }
 
-function updateCard(state) {
-    const card = cards.get(state.intersection_id) ?? createCard(state.intersection_id);
-    logChanges(state, card);
-    card.remaining = state.remaining;
-    card.light = state.light;
-    card.overridden = state.override;
-    card.element.classList.toggle("overridden", state.override);
-    drawIntersection(card.element.querySelector("canvas"), state);
-    card.element.querySelector(".queue").textContent = `Queue: ${state.queue}`;
-    card.element.querySelector(".override").textContent = state.override ? "OVERRIDE" : "";
-    showTime(card);
+function updateIntersection(state) {
+    logChanges(state, intersections.get(state.intersection_id));
+    intersections.set(state.intersection_id, { state, remaining: state.remaining });
+    render();
 }
 
 // The controller only publishes on change, so the browser counts down itself.
 function countDown() {
-    for (const card of cards.values()) {
-        card.remaining = Math.max(0, card.remaining - 1);
-        showTime(card);
+    for (const intersection of intersections.values()) {
+        intersection.remaining = Math.max(0, intersection.remaining - 1);
     }
+    render();
 }
 
 function connect() {
@@ -113,7 +95,7 @@ function connect() {
     socket.addEventListener("message", (event) => {
         const message = JSON.parse(event.data);
         if (message.topic === SIGNAL_TOPIC) {
-            updateCard(message.data);
+            updateIntersection(message.data);
         }
     });
 
