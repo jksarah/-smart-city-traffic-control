@@ -14,22 +14,26 @@ SIGNAL_TOPIC = "IntersectionSignal"
 OVERRIDE_TOPIC = "IntersectionOverride"
 CONFIG = load_config()
 TICK_SECONDS = 1
-PHASE_ORDER = ["red", "green", "yellow"]
 BASE_DURATIONS = CONFIG["durations"]
 EXTRA_QUEUE_THRESHOLD = CONFIG["extra_queue_threshold"]
 MAX_GREEN_SECONDS = CONFIG["max_green_seconds"]
 DEFAULT_OVERRIDE_SECONDS = CONFIG["default_override_seconds"]
+DIRECTIONS = CONFIG["directions"]
+# Opposite directions share a green; the two axes never are green together.
+AXES = {"NS": ("N", "S"), "EW": ("E", "W")}
+AXIS_OF = {d: axis for axis, dirs in AXES.items() for d in dirs}
+OTHER_AXIS = {"NS": "EW", "EW": "NS"}
 
-queues = {i: 0 for i in CONFIG["intersections"]}
-phases = {i: "red" for i in queues}
-remaining = {i: BASE_DURATIONS["red"] for i in queues}
+queues = {i: {d: 0 for d in DIRECTIONS} for i in CONFIG["intersections"]}
+axes = {i: "NS" for i in queues}          # axis that is green or yellow
+phases = {i: "green" for i in queues}     # "green" or "yellow" for that axis
+remaining = {i: BASE_DURATIONS["green"] for i in queues}
 overridden = set()
 last_published = {}
 
 
-def next_phase(phase):
-    index = PHASE_ORDER.index(phase)
-    return PHASE_ORDER[(index + 1) % len(PHASE_ORDER)]
+def axis_queue(intersection_id, axis):
+    return sum(queues[intersection_id][d] for d in AXES[axis])
 
 
 def phase_duration(phase, queue_length):
@@ -40,21 +44,38 @@ def phase_duration(phase, queue_length):
     return duration
 
 
+def lights_of(intersection_id):
+    """Light colour for every direction."""
+    axis, phase = axes[intersection_id], phases[intersection_id]
+    return {d: (phase if AXIS_OF[d] == axis else "red") for d in DIRECTIONS}
+
+
 def advance(intersection_id):
-    """Count down one tick; move to the next phase when time runs out."""
+    """Count down one tick; green -> yellow, then give the turn to the next axis."""
     remaining[intersection_id] -= TICK_SECONDS
-    if remaining[intersection_id] <= 0:
-        phase = next_phase(phases[intersection_id])
-        phases[intersection_id] = phase
-        overridden.discard(intersection_id)
-        remaining[intersection_id] = phase_duration(phase, queues[intersection_id])
+    if remaining[intersection_id] > 0:
+        return
+    overridden.discard(intersection_id)
+    axis = axes[intersection_id]
+    if phases[intersection_id] == "green":
+        phases[intersection_id] = "yellow"
+        remaining[intersection_id] = BASE_DURATIONS["yellow"]
+        return
+    # Yellow ended: switch axis unless only the current one has waiting cars.
+    other = OTHER_AXIS[axis]
+    if axis_queue(intersection_id, other) > 0 or axis_queue(intersection_id, axis) == 0:
+        axes[intersection_id] = axis = other
+    phases[intersection_id] = "green"
+    remaining[intersection_id] = phase_duration("green", axis_queue(intersection_id, axis))
 
 
 def apply_override(command):
     intersection_id = command.get("intersection_id")
-    if intersection_id not in queues:
+    direction = command.get("direction")
+    if intersection_id not in queues or direction not in AXIS_OF:
         return
     if command.get("action") == "free":
+        axes[intersection_id] = AXIS_OF[direction]
         phases[intersection_id] = "green"
         remaining[intersection_id] = command.get("duration", DEFAULT_OVERRIDE_SECONDS)
         overridden.add(intersection_id)
@@ -68,14 +89,14 @@ def apply_override(command):
 def current_state(intersection_id):
     return {
         "intersection_id": intersection_id,
-        "light": phases[intersection_id],      
-        "queue": queues[intersection_id],
+        "lights": lights_of(intersection_id),
+        "queues": dict(queues[intersection_id]),
         "override": intersection_id in overridden,
     }
 
 
 async def publish_state(client, intersection_id):
-    """Publish only when the light, queue or override flag changed."""
+    """Publish only when a light, queue or override flag changed."""
     state = current_state(intersection_id)
     if last_published.get(intersection_id) == state:
         return
@@ -86,12 +107,13 @@ async def publish_state(client, intersection_id):
 
 def apply_sensor_event(event):
     intersection_id = event.get("intersection_id")
-    if intersection_id not in queues:
+    direction = event.get("direction")
+    if intersection_id not in queues or direction not in AXIS_OF:
         return
     if event.get("type") == "arrive":
-        queues[intersection_id] += 1
+        queues[intersection_id][direction] += 1
     elif event.get("type") == "depart":
-        queues[intersection_id] = max(0, queues[intersection_id] - 1)
+        queues[intersection_id][direction] = max(0, queues[intersection_id][direction] - 1)
 
 
 async def handle_messages(client):

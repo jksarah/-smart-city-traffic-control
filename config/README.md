@@ -6,7 +6,8 @@ Edit it and restart the components to apply changes. `settings.py` loads it.
 | Setting | Meaning |
 | :--- | :--- |
 | `intersections` | Intersection ids. Add an id to add an intersection. |
-| `durations` | Seconds for each light: `red`, `green`, `yellow`. |
+| `directions` | Road arms of every intersection: N, E, S, W. |
+| `durations` | Seconds for `green` and `yellow` (`red` is unused: the other axis is red while one is lit). |
 | `extra_queue_threshold` | Green is extended by 1 second per car above this queue length. |
 | `max_green_seconds` | Longest green the extension can reach. |
 | `default_override_seconds` | Override length when the command gives no duration. |

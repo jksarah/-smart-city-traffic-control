@@ -16,17 +16,19 @@ CONFIG = load_config()
 MIN_DELAY_SECONDS, MAX_DELAY_SECONDS = CONFIG["arrival_delay_seconds"]
 DEPART_SECONDS = 1
 
-waiting = {i: 0 for i in CONFIG["intersections"]}
-lights = {i: "red" for i in waiting}
+DIRECTIONS = CONFIG["directions"]
+
+waiting = {(i, d): 0 for i in CONFIG["intersections"] for d in DIRECTIONS}
+lights = {key: "red" for key in waiting}
 
 
-def intersections_to_release():
-    """Intersections with a green light and at least one waiting car."""
-    return [i for i in waiting if lights[i] == "green" and waiting[i] > 0]
+def roads_to_release():
+    """(intersection, direction) roads with a green light and a waiting car."""
+    return [key for key in waiting if lights[key] == "green" and waiting[key] > 0]
 
 
-async def send_event(client, intersection_id, event_type):
-    event = {"intersection_id": intersection_id, "type": event_type}
+async def send_event(client, intersection_id, direction, event_type):
+    event = {"intersection_id": intersection_id, "direction": direction, "type": event_type}
     await client.publish(SENSOR_TOPIC, event)
     print("Sent:", event)
 
@@ -34,24 +36,26 @@ async def send_event(client, intersection_id, event_type):
 async def read_signals(client):
     await client.subscribe(SIGNAL_TOPIC)
     async for _, state in client.messages():
-        if state["intersection_id"] in lights:
-            lights[state["intersection_id"]] = state["light"]
+        for direction, light in state["lights"].items():
+            if (state["intersection_id"], direction) in lights:
+                lights[(state["intersection_id"], direction)] = light
 
 
 async def generate_arrivals(client):
     while True:
         intersection_id = random.choice(CONFIG["intersections"])
-        waiting[intersection_id] += 1
-        await send_event(client, intersection_id, "arrive")
+        direction = random.choice(DIRECTIONS)
+        waiting[(intersection_id, direction)] += 1
+        await send_event(client, intersection_id, direction, "arrive")
         await asyncio.sleep(random.uniform(MIN_DELAY_SECONDS, MAX_DELAY_SECONDS))
 
 
 async def release_cars(client):
     while True:
         await asyncio.sleep(DEPART_SECONDS)
-        for intersection_id in intersections_to_release():
-            waiting[intersection_id] -= 1
-            await send_event(client, intersection_id, "depart")
+        for intersection_id, direction in roads_to_release():
+            waiting[(intersection_id, direction)] -= 1
+            await send_event(client, intersection_id, direction, "depart")
 
 
 async def main():

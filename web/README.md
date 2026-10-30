@@ -4,6 +4,6 @@ Web UI. Open `web/index.html` in a browser (broker must be running).
 
 Intersections are laid out in a grid (3 per row). Each one has four road arms that join its neighbours' arms into a connected road network.
 
-Click an intersection to force it green for a few seconds. Click it again to cancel.
+Each intersection has a light and queue on all four arms. Click an arm to force that road (and its opposite) green for a few seconds. Click again to cancel.
 
 The event log lists light changes, overrides and connection changes, newest first.

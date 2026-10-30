@@ -21,8 +21,8 @@ python controller/controller.py
 python simulator/simulator.py
 ```
 
-Then open `web/index.html` in a browser. Click an intersection to force it green;
-click again to cancel. The page reconnects by itself if the broker restarts.
+Then open `web/index.html` in a browser. Click an arm of an intersection to force
+that road green; click again to cancel. The page reconnects by itself if the broker restarts.
 
 Settings (intersections, timings) are in `config/config.json`.
 
