@@ -12,7 +12,7 @@ OVERRIDE_TOPIC = "IntersectionOverride"
 
 async def main():
     async with BrokerClient() as client:
-        command = {"intersection_id": 2, "action": "free", "duration": 10, "source": "check"}
+        command = {"intersection_id": 2, "direction": "N", "action": "free", "duration": 10, "source": "check"}
         await client.publish(OVERRIDE_TOPIC, command)
         print("Sent override:", command)
 

@@ -13,6 +13,7 @@ def test_config_has_required_settings():
     config = load_config()
     assert config["intersections"]
     assert set(config["durations"]) == {"red", "green", "yellow"}
+    assert set(config["directions"]) == {"N", "E", "S", "W"}
     assert len(config["arrival_delay_seconds"]) == 2
 
 
@@ -21,4 +22,8 @@ def test_controller_and_simulator_use_config_intersections():
     import simulator
     ids = load_config()["intersections"]
     assert list(controller.queues) == ids
-    assert list(simulator.waiting) == ids
+    assert list(simulator.waiting) == [(i, d) for i in ids for d in config_directions()]
+
+
+def config_directions():
+    return load_config()["directions"]

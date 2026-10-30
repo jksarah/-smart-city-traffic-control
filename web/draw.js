@@ -36,43 +36,68 @@ function drawRoads(context, x, y) {
     context.fillRect(x + middle - ROAD_WIDTH / 2, y + middle - ROAD_WIDTH / 2 - 2, ROAD_WIDTH, 2);
 }
 
-function drawLight(context, x, y, light) {
+// For each direction: unit vector pointing from the centre out along that arm.
+const ARMS = { N: [0, -1], S: [0, 1], E: [1, 0], W: [-1, 0] };
+
+// Which arm of a cell a click at (dx, dy) from its centre is closest to.
+function armAt(dx, dy) {
+    if (Math.abs(dx) > Math.abs(dy)) {
+        return dx > 0 ? "E" : "W";
+    }
+    return dy > 0 ? "S" : "N";
+}
+
+// A light sits beside each arm, just outside the intersection box.
+function drawLight(context, x, y, direction, light) {
+    const [ax, ay] = ARMS[direction];
     const middle = CELL_SIZE / 2;
+    const distance = ROAD_WIDTH / 2 + 10;
+    const side = ROAD_WIDTH / 2 + 12;
     context.fillStyle = LIGHT_COLORS[light];
     context.beginPath();
-    context.arc(x + middle + ROAD_WIDTH / 2 + 12, y + middle - ROAD_WIDTH / 2 - 8, 8, 0, Math.PI * 2);
+    context.arc(
+        x + middle + ax * distance - ay * side,
+        y + middle + ay * distance + ax * side,
+        7, 0, Math.PI * 2
+    );
     context.fill();
 }
 
-// Cars wait on the road above the intersection, heading down.
-function drawCars(context, x, y, queue) {
+// Cars wait on their own arm, lined up from the stop line outward.
+function drawCars(context, x, y, direction, queue) {
+    const [ax, ay] = ARMS[direction];
     const middle = CELL_SIZE / 2;
-    const stopLine = y + middle - ROAD_WIDTH / 2 - 2;
+    const width = ax === 0 ? CAR_WIDTH : CAR_LENGTH;
+    const height = ax === 0 ? CAR_LENGTH : CAR_WIDTH;
     context.fillStyle = "#4fc3f7";
     const drawn = Math.min(queue, MAX_DRAWN_CARS);
     for (let i = 0; i < drawn; i++) {
-        const top = stopLine - CAR_GAP - CAR_LENGTH - i * (CAR_LENGTH + CAR_GAP);
-        context.fillRect(x + middle - CAR_WIDTH / 2, top, CAR_WIDTH, CAR_LENGTH);
+        const gap = ROAD_WIDTH / 2 + CAR_GAP + i * (CAR_LENGTH + CAR_GAP);
+        const centreX = x + middle + ax * (gap + CAR_LENGTH / 2);
+        const centreY = y + middle + ay * (gap + CAR_LENGTH / 2);
+        context.fillRect(centreX - width / 2, centreY - height / 2, width, height);
     }
     if (queue > MAX_DRAWN_CARS) {
+        const gap = ROAD_WIDTH / 2 + CAR_GAP + MAX_DRAWN_CARS * (CAR_LENGTH + CAR_GAP);
         context.fillStyle = "#e6e6e6";
         context.font = "12px sans-serif";
-        context.fillText(`+${queue - MAX_DRAWN_CARS}`, x + middle + CAR_WIDTH, y + 14);
+        context.fillText(`+${queue - MAX_DRAWN_CARS}`, x + middle + ax * gap - 8 + 20 * (ax === 0), y + middle + ay * gap + 4);
     }
 }
 
 function drawLabels(context, x, y, intersection) {
     const left = x + 6;
-    const middle = y + CELL_SIZE / 2;
+    const { state } = intersection;
+    const total = Object.values(state.queues).reduce((sum, value) => sum + value, 0);
     context.fillStyle = "#e6e6e6";
     context.font = "bold 11px sans-serif";
-    context.fillText(`Intersection ${intersection.state.intersection_id}`, left, y + 14);
+    context.fillText(`Intersection ${state.intersection_id}`, left, y + 14);
     context.font = "12px sans-serif";
-    context.fillText(`Queue: ${intersection.state.queue}`, left, middle + ROAD_WIDTH / 2 + 16);
-    context.fillText(`Time left: ${intersection.remaining}s`, left, middle + ROAD_WIDTH / 2 + 32);
-    if (intersection.state.override) {
+    context.fillText(`Queue: ${total}`, left, y + CELL_SIZE - 22);
+    context.fillText(`Time left: ${intersection.remaining}s`, left, y + CELL_SIZE - 8);
+    if (state.override) {
         context.fillStyle = OVERRIDE_COLOR;
-        context.fillText("OVERRIDE", left, middle + ROAD_WIDTH / 2 + 48);
+        context.fillText("OVERRIDE", left, y + 30);
         context.strokeStyle = OVERRIDE_COLOR;
         context.lineWidth = 2;
         context.strokeRect(x + 1, y + 1, CELL_SIZE - 2, CELL_SIZE - 2);
@@ -92,8 +117,10 @@ function drawMap(canvas, intersections) {
         const x = column * CELL_SIZE;
         const y = row * CELL_SIZE;
         drawRoads(context, x, y);
-        drawLight(context, x, y, intersection.state.light);
-        drawCars(context, x, y, intersection.state.queue);
+        for (const direction of Object.keys(ARMS)) {
+            drawLight(context, x, y, direction, intersection.state.lights[direction]);
+            drawCars(context, x, y, direction, intersection.state.queues[direction]);
+        }
         drawLabels(context, x, y, intersection);
     });
 }

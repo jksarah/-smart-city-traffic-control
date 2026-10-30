@@ -32,11 +32,11 @@ function setStatus(text) {
     logEvent(`Broker ${text}`);
 }
 
-function sendOverride(intersectionId, action) {
+function sendOverride(intersectionId, direction, action) {
     if (socket?.readyState !== WebSocket.OPEN) {
         return;
     }
-    const command = { intersection_id: intersectionId, action, source: "web-ui" };
+    const command = { intersection_id: intersectionId, direction, action, source: "web-ui" };
     socket.send(JSON.stringify({ type: "publish", topic: OVERRIDE_TOPIC, data: command }));
 }
 
@@ -48,7 +48,7 @@ function render() {
     drawMap(mapElement, sortedIntersections());
 }
 
-// Clicking forces green; clicking an overridden intersection cancels it.
+// Clicking an arm forces that road green; clicking an overridden intersection cancels it.
 mapElement.addEventListener("click", (event) => {
     const bounds = mapElement.getBoundingClientRect();
     const column = Math.floor((event.clientX - bounds.left) / CELL_SIZE);
@@ -56,7 +56,9 @@ mapElement.addEventListener("click", (event) => {
     const clicked = sortedIntersections()[row * COLUMNS + column];
     if (column < COLUMNS && clicked) {
         const { intersection_id: id, override } = clicked.state;
-        sendOverride(id, override ? "cancel" : "free");
+        const dx = event.clientX - bounds.left - column * CELL_SIZE - CELL_SIZE / 2;
+        const dy = event.clientY - bounds.top - row * CELL_SIZE - CELL_SIZE / 2;
+        sendOverride(id, armAt(dx, dy), override ? "cancel" : "free");
     }
 });
 
@@ -65,8 +67,10 @@ function logChanges(state, previous) {
     if (state.override !== (previous?.state.override ?? false)) {
         logEvent(`${name}: override ${state.override ? "started" : "ended"}`);
     }
-    if (state.light !== previous?.state.light) {
-        logEvent(`${name}: ${state.light}`);
+    for (const [direction, light] of Object.entries(state.lights)) {
+        if (light !== previous?.state.lights[direction]) {
+            logEvent(`${name} ${direction}: ${light}`);
+        }
     }
 }
 
