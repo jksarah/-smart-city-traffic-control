@@ -6,6 +6,8 @@ const CAR_LENGTH = 22;
 const CAR_GAP = 4;
 const MAX_DRAWN_CARS = 3;
 const LIGHT_COLORS = { red: "#e53935", green: "#43a047", yellow: "#fdd835" };
+const MAP_MARGIN = 20;
+const MIN_SCALE = 0.5;
 const OVERRIDE_COLOR = "#ffb300";
 
 // Intersections fill the grid row by row.
@@ -13,10 +15,20 @@ function cellOf(index) {
     return { column: index % COLUMNS, row: Math.floor(index / COLUMNS) };
 }
 
+// Everything is drawn in CELL_SIZE units, then scaled up to fill the window.
+let mapScale = 1;
+
 function mapSize(count) {
     const columns = Math.min(COLUMNS, count);
     const rows = Math.ceil(count / COLUMNS);
     return { width: columns * CELL_SIZE, height: rows * CELL_SIZE };
+}
+
+function fitScale(canvas, size) {
+    const top = canvas.getBoundingClientRect().top + window.scrollY;
+    const availableWidth = window.innerWidth - 2 * MAP_MARGIN;
+    const availableHeight = window.innerHeight - top - MAP_MARGIN;
+    return Math.max(MIN_SCALE, Math.min(availableWidth / size.width, availableHeight / size.height));
 }
 
 // Each cell draws its four road arms to the cell edges, so neighbours join up.
@@ -107,9 +119,11 @@ function drawLabels(context, x, y, intersection) {
 // `intersections` is sorted by id; each has `state` and `remaining`.
 function drawMap(canvas, intersections) {
     const size = mapSize(intersections.length);
-    canvas.width = size.width;
-    canvas.height = size.height;
+    mapScale = fitScale(canvas, size);
+    canvas.width = size.width * mapScale;
+    canvas.height = size.height * mapScale;
     const context = canvas.getContext("2d");
+    context.scale(mapScale, mapScale);
     context.fillStyle = "#2a303c";
     context.fillRect(0, 0, size.width, size.height);
     intersections.forEach((intersection, index) => {
