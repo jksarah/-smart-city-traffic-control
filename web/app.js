@@ -51,13 +51,15 @@ function render() {
 // Clicking an arm forces that road green; clicking an overridden intersection cancels it.
 mapElement.addEventListener("click", (event) => {
     const bounds = mapElement.getBoundingClientRect();
-    const column = Math.floor((event.clientX - bounds.left) / CELL_SIZE);
-    const row = Math.floor((event.clientY - bounds.top) / CELL_SIZE);
+    const mapX = (event.clientX - bounds.left) / mapScale;
+    const mapY = (event.clientY - bounds.top) / mapScale;
+    const column = Math.floor(mapX / CELL_SIZE);
+    const row = Math.floor(mapY / CELL_SIZE);
     const clicked = sortedIntersections()[row * COLUMNS + column];
     if (column < COLUMNS && clicked) {
         const { intersection_id: id, override } = clicked.state;
-        const dx = event.clientX - bounds.left - column * CELL_SIZE - CELL_SIZE / 2;
-        const dy = event.clientY - bounds.top - row * CELL_SIZE - CELL_SIZE / 2;
+        const dx = mapX - column * CELL_SIZE - CELL_SIZE / 2;
+        const dy = mapY - row * CELL_SIZE - CELL_SIZE / 2;
         sendOverride(id, armAt(dx, dy), override ? "cancel" : "free");
     }
 });
@@ -109,5 +111,6 @@ function connect() {
     });
 }
 
+window.addEventListener("resize", render);
 setInterval(countDown, COUNTDOWN_MS);
 connect();

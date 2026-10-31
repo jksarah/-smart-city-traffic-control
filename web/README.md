@@ -1,6 +1,6 @@
 Web UI. Open `web/index.html` in a browser (broker must be running).
 
-`index.html` is the page and `style.css` styles it. `app.js` connects to the broker and draws one map of connected roads with each intersection's light, queue and time left. `draw.js` draws the roads, lights and queued cars on the map canvas.
+`index.html` is the page and `style.css` styles it. `app.js` connects to the broker and draws one map of connected roads with each intersection's light, queue and time left. `draw.js` scales the map to fill the window (redrawn on resize) and draws the roads, lights and queued cars on the map canvas.
 
 Intersections are laid out in a grid (3 per row). Each one has four road arms that join its neighbours' arms into a connected road network.
 
